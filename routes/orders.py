@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timezone, date
+from datetime import date
 from database import get_db
-from models import Order, OrderItem
+from models import Order
 from schemas import OrderSchema, StatusUpdate, RevenueStats
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -26,8 +26,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 # ─── Status update ───────────────────────────────────
 @router.patch("/{order_id}/status", response_model=OrderSchema)
-def update_status(order_id: int, body: StatusUpdate,
-                  db: Session = Depends(get_db)):
+def update_status(order_id: int, body: StatusUpdate, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -47,20 +46,23 @@ def update_status(order_id: int, body: StatusUpdate,
 def get_revenue(db: Session = Depends(get_db)):
     today = date.today()
 
-    today_revenue = db.query(func.sum(Order.total)).filter(
-        func.date(Order.created_at) == today,
-        Order.status != "cancelled"
-    ).scalar() or 0
+    today_revenue = (
+        db.query(func.sum(Order.total))
+        .filter(func.date(Order.created_at) == today, Order.status != "cancelled")
+        .scalar()
+        or 0
+    )
 
-    total_revenue = db.query(func.sum(Order.total)).filter(
-        Order.status != "cancelled"
-    ).scalar() or 0
+    total_revenue = (
+        db.query(func.sum(Order.total)).filter(Order.status != "cancelled").scalar()
+        or 0
+    )
 
     total_orders = db.query(func.count(Order.id)).scalar() or 0
 
-    pending_count = db.query(func.count(Order.id)).filter(
-        Order.status == "pending"
-    ).scalar() or 0
+    pending_count = (
+        db.query(func.count(Order.id)).filter(Order.status == "pending").scalar() or 0
+    )
 
     return RevenueStats(
         today_revenue=today_revenue,
